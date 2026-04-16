@@ -10,7 +10,7 @@
     "axios": "^1.6.0"
   },
   "scripts": {
-    "start": "node bot-sasg.js",
+    "start": "node bot-sasg.js & node sasg-discord.js",
     "build": "echo 'No build step required'"
   }
 }
