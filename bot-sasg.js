@@ -596,27 +596,42 @@ async function checkMissingAbsence(channel) {
 }
 
 // --- TUGAS RUTIN (SINKRONISASI & FORUM) ---
+// --- TUGAS RUTIN (SINKRONISASI & FORUM) ---
 async function runSasgTask() {
     console.log(`\n--- [START TASK ${new Date().toLocaleString()}] ---`);
     
     const serverGuild = client.guilds.cache.get(DISCORD_GUILD_ID);
-    if (!serverGuild) return;
+    if (!serverGuild) {
+        console.error("[ERROR] Guild tidak ditemukan");
+        return;
+    }
 
     try {
         // --- PHASE 1: CLEANUP DATA LAMA ---
+        console.log("[PHASE-1] Memulai cleanup...");
         await cleanupUsersWithoutRole(serverGuild);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000)); // ← Naikkan dari 1000 ke 3000
+        
         await cleanupOrphanedAbsences(serverGuild);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000)); // ← Naikkan dari 1000 ke 3000
 
         // --- PHASE 1B: TANDAI THREAD SEBAGAI ARCHIVED ---
+        console.log("[PHASE-1B] Tandai thread archived...");
         await markThreadAsArchived(serverGuild);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000)); // ← Naikkan dari 1000 ke 3000
 
         // --- PHASE 2: SINKRONISASI DATA BARU ---
-        const daftarMember = await serverGuild.members.fetch();
+        console.log("[PHASE-2] Sinkronisasi data member...");
+        let daftarMember;
+        try {
+            daftarMember = await serverGuild.members.fetch();
+        } catch (err) {
+            console.error("[ERROR] Gagal fetch members:", err.message);
+            console.log("--- [TASK COMPLETED] ---\n");
+            return;
+        }
+
         const arrayDataMaster = [];
-        const idsAktif = [];
 
         daftarMember.forEach(member => {
             if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
@@ -629,7 +644,6 @@ async function runSasgTask() {
                 });
 
                 const namaDisplay = member.nickname || member.user.username;
-                idsAktif.push(member.id);
 
                 arrayDataMaster.push({
                     discord_id: member.id,
@@ -644,14 +658,24 @@ async function runSasgTask() {
 
         // Simpan data terbaru
         if (arrayDataMaster.length > 0) {
-            await supabase.from('users_master').upsert(arrayDataMaster, { onConflict: 'discord_id' });
-            console.log(`[SYNC] ${arrayDataMaster.length} user berhasil di-upsert`);
+            try {
+                await supabase.from('users_master').upsert(arrayDataMaster, { onConflict: 'discord_id' });
+                console.log(`[SYNC] ${arrayDataMaster.length} user berhasil di-upsert`);
+            } catch (err) {
+                console.error("[ERROR] Gagal upsert users_master:", err.message);
+            }
         }
 
+        await new Promise(resolve => setTimeout(resolve, 2000)); // ← Delay sebelum forum
+
         // --- PHASE 3: PROSES FORUM ---
+        console.log("[PHASE-3] Proses forum logs...");
         await processForumLogs(serverGuild);
 
+        await new Promise(resolve => setTimeout(resolve, 2000)); // ← Delay sebelum reminder
+
         // --- PHASE 4: REMINDER ABSENSI ---
+        console.log("[PHASE-4] Pengecekan reminder...");
         const waktuJkt = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
         const jamSekarang = waktuJkt.getHours();
         const menitSekarang = waktuJkt.getMinutes();
@@ -659,7 +683,9 @@ async function runSasgTask() {
         if (menitSekarang <= 10) {
             if (jamSekarang === 19 || jamSekarang === 22) {
                 const channelAnnounce = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
-                if (channelAnnounce) await checkMissingAbsence(channelAnnounce);
+                if (channelAnnounce) {
+                    await checkMissingAbsence(channelAnnounce);
+                }
             }
         }
 
