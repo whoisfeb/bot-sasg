@@ -642,7 +642,7 @@ async function runSasgTask() {
 }
 
 // --- EVENT BOT READY ---
-client.once('clientReady', () => {
+client.once('ready', () => {
     console.log("\n========================================");
     console.log(`Bot Terhubung Sebagai: ${client.user.tag}`);
     console.log("Status: Online & Monitoring Supabase");
