@@ -1,0 +1,35 @@
+name: SASG Member Sync
+concurrency:
+  group: sasg-bot-group
+  cancel-in-progress: true
+
+on:
+  schedule:
+    # Berjalan setiap jam (menit ke-0)
+    - cron: '*/30 * * * *'
+  # Memungkinkan Anda menjalankan manual melalui tab "Actions"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Sync Script
+        run: node bot-sasg.js # GANTI dengan nama file .js Anda
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
