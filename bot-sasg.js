@@ -51,7 +51,6 @@ const DIVISI_MAP = {
     "1444908272363769887": "HUMAN RESOURCE BUREAU",
     "1444921352120434819": "INTERNAL AFFAIRS DIVISION"
 };
-
 // --- FUNGSI VALIDASI URL ---
 function isValidUrl(url) {
     if (!url || typeof url !== 'string') return false;
@@ -70,14 +69,14 @@ function isValidUrl(url) {
     }
 }
 
-// --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTERS ---
+// --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTER ---
 async function cleanupUsersWithoutRole(guild) {
-    console.log("[CLEANUP-1] Memulai cleanup user tanpa required role dari users_masters...");
+    console.log("[CLEANUP-1] Memulai cleanup user tanpa required role dari users_master...");
     
     try {
         // 1. AMBIL SEMUA USER DI users_master
         const { data: allUsersInDb, error: fetchErr } = await supabase
-            .from('users_masters')
+            .from('users_master')
             .select('discord_id');
 
         if (fetchErr) {
@@ -86,11 +85,9 @@ async function cleanupUsersWithoutRole(guild) {
         }
 
         if (!allUsersInDb || allUsersInDb.length === 0) {
-            console.log("[CLEANUP-1] ℹ users_masters kosong, tidak ada yang dibersihkan.");
+            console.log("[CLEANUP-1] users_master kosong.");
             return;
         }
-
-        console.log(`[CLEANUP-1] Ditemukan ${allUsersInDb.length} user di database, melakukan pengecekan...`);
 
         let cleanupCount = 0;
 
@@ -100,13 +97,10 @@ async function cleanupUsersWithoutRole(guild) {
             
             try {
                 // Cek apakah user masih ada di Discord & punya required role
-                const member = await guild.members.fetch(discordId).catch((err) => {
-                    console.warn(`  ⚠ Tidak bisa fetch member ${discordId}: ${err.message}`);
-                    return null;
-                });
+                const member = await guild.members.fetch(discordId).catch(() => null);
                 
                 if (!member || !member.roles.cache.has(REQUIRED_ROLE_ID)) {
-                    console.log(`[CLEANUP-1] ❌ User ${discordId} tidak punya required role, menghapus...`);
+                    console.log(`[CLEANUP-1] User ${discordId} tidak punya required role, menghapus...`);
 
                     // 2A. HAPUS GAMBAR BUKTI DARI STORAGE
                     const { data: absenRecords, error: absenErr } = await supabase
@@ -126,12 +120,12 @@ async function cleanupUsersWithoutRole(guild) {
                                         .remove([pathLengkap]);
                                     
                                     if (!delStorageErr) {
-                                        console.log(`    ✓ Gambar dihapus: ${namaFile}`);
+                                        console.log(`  ✓ Gambar dihapus: ${namaFile}`);
                                     } else {
-                                        console.warn(`    ⚠ Gagal hapus gambar ${namaFile}: ${delStorageErr.message}`);
+                                        console.warn(`  ⚠ Gagal hapus gambar ${namaFile}: ${delStorageErr.message}`);
                                     }
                                 } catch (imgErr) {
-                                    console.warn(`    ⚠ Error hapus gambar:`, imgErr.message);
+                                    console.warn(`  ⚠ Error hapus gambar:`, imgErr.message);
                                 }
                             }
                         }
@@ -144,22 +138,22 @@ async function cleanupUsersWithoutRole(guild) {
                         .eq('discord_id', discordId);
 
                     if (!delAbsenErr) {
-                        console.log(`    ✓ Data absensi dihapus`);
+                        console.log(`  ✓ Data absensi dihapus`);
                     } else {
-                        console.warn(`    ⚠ Gagal hapus absensi: ${delAbsenErr.message}`);
+                        console.warn(`  ⚠ Gagal hapus absensi: ${delAbsenErr.message}`);
                     }
 
                     // 2C. HAPUS USER DARI users_master
                     const { error: delUserErr } = await supabase
-                        .from('users_masters')
+                        .from('users_master')
                         .delete()
                         .eq('discord_id', discordId);
 
                     if (!delUserErr) {
-                        console.log(`    ✓ User ${discordId} dihapus dari users_masters`);
+                        console.log(`  ✓ User ${discordId} dihapus dari users_master`);
                         cleanupCount++;
                     } else {
-                        console.warn(`    ⚠ Gagal hapus user: ${delUserErr.message}`);
+                        console.warn(`  ⚠ Gagal hapus user: ${delUserErr.message}`);
                     }
                 }
             } catch (err) {
@@ -167,10 +161,10 @@ async function cleanupUsersWithoutRole(guild) {
             }
 
             // Jeda untuk avoid rate limit
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        console.log(`[CLEANUP-1] ✅ Selesai. Total dihapus: ${cleanupCount} user`);
+        console.log(`[CLEANUP-1] Selesai. Total dihapus: ${cleanupCount} user`);
     } catch (errGlobal) {
         console.error("[CRITICAL ERROR] cleanupUsersWithoutRole:", errGlobal.message);
     }
@@ -183,16 +177,15 @@ async function cleanupOrphanedAbsences(guild) {
     try {
         // 1. AMBIL SEMUA USER DI users_master
         const { data: validUsers, error: fetchValidErr } = await supabase
-            .from('users_masters')
+            .from('users_master')
             .select('discord_id');
 
         if (fetchValidErr) {
-            console.error("[DB ERROR] Gagal fetch users_masters:", fetchValidErr.message);
+            console.error("[DB ERROR] Gagal fetch users_master:", fetchValidErr.message);
             return;
         }
 
         const validUserIds = validUsers ? validUsers.map(u => u.discord_id) : [];
-        console.log(`[CLEANUP-2] Valid user count: ${validUserIds.length}`);
 
         // 2. AMBIL SEMUA DATA DI absensi_sapd
         const { data: allAbsences, error: fetchAbsenErr } = await supabase
@@ -205,11 +198,9 @@ async function cleanupOrphanedAbsences(guild) {
         }
 
         if (!allAbsences || allAbsences.length === 0) {
-            console.log("[CLEANUP-2] ℹ Tidak ada data absensi.");
+            console.log("[CLEANUP-2] Tidak ada data absensi.");
             return;
         }
-
-        console.log(`[CLEANUP-2] Ditemukan ${allAbsences.length} data absensi, melakukan pengecekan...`);
 
         let orphanedCount = 0;
 
@@ -222,15 +213,12 @@ async function cleanupOrphanedAbsences(guild) {
                 const userExistsInDb = validUserIds.includes(discordId);
                 
                 // Cek apakah user masih ada di Discord & punya required role
-                const member = await guild.members.fetch(discordId).catch((err) => {
-                    console.warn(`  ⚠ Tidak bisa fetch member ${discordId}: ${err.message}`);
-                    return null;
-                });
+                const member = await guild.members.fetch(discordId).catch(() => null);
                 const hasRequiredRole = member ? member.roles.cache.has(REQUIRED_ROLE_ID) : false;
 
                 // Jika user tidak ada di DB dan tidak punya required role, hapus absensi
                 if (!userExistsInDb && !hasRequiredRole) {
-                    console.log(`[CLEANUP-2] ❌ Data absensi ${absenceRecord.id} (user: ${discordId}) orphaned, menghapus...`);
+                    console.log(`[CLEANUP-2] Data absensi ${absenceRecord.id} (user: ${discordId}) orphaned, menghapus...`);
 
                     // 3A. HAPUS GAMBAR BUKTI JIKA ADA & VALID
                     if (absenceRecord.bukti_foto && isValidUrl(absenceRecord.bukti_foto)) {
@@ -243,12 +231,12 @@ async function cleanupOrphanedAbsences(guild) {
                                 .remove([pathLengkap]);
                             
                             if (!delStorageErr) {
-                                console.log(`    ✓ Gambar dihapus: ${namaFile}`);
+                                console.log(`  ✓ Gambar dihapus: ${namaFile}`);
                             } else {
-                                console.warn(`    ⚠ Gagal hapus gambar: ${delStorageErr.message}`);
+                                console.warn(`  ⚠ Gagal hapus gambar: ${delStorageErr.message}`);
                             }
                         } catch (imgErr) {
-                            console.warn(`    ⚠ Error hapus gambar:`, imgErr.message);
+                            console.warn(`  ⚠ Error hapus gambar:`, imgErr.message);
                         }
                     }
 
@@ -259,10 +247,10 @@ async function cleanupOrphanedAbsences(guild) {
                         .eq('id', absenceRecord.id);
 
                     if (!delAbsenErr) {
-                        console.log(`    ✓ Data absensi ID ${absenceRecord.id} dihapus`);
+                        console.log(`  ✓ Data absensi ID ${absenceRecord.id} dihapus`);
                         orphanedCount++;
                     } else {
-                        console.warn(`    ⚠ Gagal hapus absensi: ${delAbsenErr.message}`);
+                        console.warn(`  ⚠ Gagal hapus absensi: ${delAbsenErr.message}`);
                     }
                 }
             } catch (err) {
@@ -270,10 +258,10 @@ async function cleanupOrphanedAbsences(guild) {
             }
 
             // Jeda untuk avoid rate limit
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        console.log(`[CLEANUP-2] ✅ Selesai. Total dihapus: ${orphanedCount} data absensi orphaned`);
+        console.log(`[CLEANUP-2] Selesai. Total dihapus: ${orphanedCount} data absensi orphaned`);
     } catch (errGlobal) {
         console.error("[CRITICAL ERROR] cleanupOrphanedAbsences:", errGlobal.message);
     }
@@ -292,7 +280,7 @@ async function markThreadAsArchived(guild) {
 
         // Ambil user valid dari users_master (yang masih punya role)
         const { data: validUsers, error: fetchErr } = await supabase
-            .from('users_masters')
+            .from('users_master')
             .select('discord_id');
 
         if (fetchErr) {
@@ -304,7 +292,6 @@ async function markThreadAsArchived(guild) {
 
         // Ambil semua thread
         const threads = await forumChannel.threads.fetchActive();
-        console.log(`[ARCHIVE-THREAD] Ditemukan ${threads.threads.size} thread aktif`);
 
         let markedCount = 0;
 
@@ -312,10 +299,7 @@ async function markThreadAsArchived(guild) {
             // Ekstrak discord ID dari nama thread
             const idMatch = thread.name.match(/^\[(\d+)\]/);
             
-            if (!idMatch) {
-                console.log(`  ⊘ Thread "${thread.name}" tidak memiliki format ID [xxxxx]`);
-                continue;
-            }
+            if (!idMatch) continue;
 
             const discordId = idMatch[1];
 
@@ -332,8 +316,8 @@ async function markThreadAsArchived(guild) {
                     if (!thread.name.includes('[ARCHIVED]')) {
                         const newName = `[ARCHIVED] ${thread.name}`.substring(0, 100);
                         
-                        const reason = !userInDb ? "tidak ada di users_masters" : "tidak punya required role";
-                        console.log(`[ARCHIVE-THREAD] 📌 Tandai thread (${reason}): "${thread.name}" → "${newName}"`);
+                        const reason = !userInDb ? "tidak ada di users_master" : "tidak punya required role";
+                        console.log(`[ARCHIVE-THREAD] Tandai thread (${reason}): "${thread.name}" → "${newName}"`);
                         
                         try {
                             await thread.edit({ name: newName });
@@ -348,10 +332,10 @@ async function markThreadAsArchived(guild) {
             }
 
             // Jeda untuk avoid rate limit
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        console.log(`[ARCHIVE-THREAD] ✅ Selesai. Total thread di-archive: ${markedCount}`);
+        console.log(`[ARCHIVE-THREAD] Selesai. Total thread di-archive: ${markedCount}`);
     } catch (err) {
         console.error("[CRITICAL ERROR] markThreadAsArchived:", err.message);
     }
@@ -359,7 +343,7 @@ async function markThreadAsArchived(guild) {
 
 // --- FUNGSI UNTUK PROSES FORUM LOGS ---
 async function processForumLogs(guild) {
-    console.log("[FORUM-LOGS] Memulai proses pengecekan forum logs...");
+    console.log("[DEBUG] Memulai proses pengecekan forum logs...");
     
     try {
         const forumChannel = await guild.channels.fetch(FORUM_CHANNEL_ID);
@@ -379,11 +363,9 @@ async function processForumLogs(guild) {
         }
 
         if (!logs || logs.length === 0) {
-            console.log("[FORUM-LOGS] ℹ Tidak ada data absensi baru untuk dikirim.");
+            console.log("[INFO] Tidak ada data absensi baru untuk dikirim.");
             return;
         }
-
-        console.log(`[FORUM-LOGS] Ditemukan ${logs.length} data absensi untuk diproses`);
 
         for (let i = 0; i < logs.length; i++) {
             const log = logs[i];
@@ -394,8 +376,6 @@ async function processForumLogs(guild) {
                 const namaUser = log.nama_anggota || "Unknown";
                 const discordId = log.discord_id;
 
-                console.log(`[FORUM-LOGS] [${i + 1}/${logs.length}] Memproses: ${namaUser} (${discordId})`);
-
                 const threads = await forumChannel.threads.fetchActive();
                 
                 // === CARI THREAD BERDASARKAN DISCORD_ID ===
@@ -404,7 +384,7 @@ async function processForumLogs(guild) {
                 );
 
                 if (!targetThread) {
-                    console.log(`  📝 Membuat thread baru untuk ${namaUser} (ID: ${discordId})`);
+                    console.log(`[INFO] Membuat thread baru untuk ${namaUser} (ID: ${discordId})`);
                     targetThread = await forumChannel.threads.create({
                         name: `[${discordId}] ${namaUser}`.substring(0, 100),
                         message: { content: `Logs Kehadiran Resmi - **${namaUser}**` },
@@ -414,9 +394,9 @@ async function processForumLogs(guild) {
                     // === UPDATE NAMA THREAD JIKA ADA PERUBAHAN NAMA ===
                     const currentName = `[${discordId}] ${namaUser}`.substring(0, 100);
                     if (targetThread.name !== currentName) {
-                        console.log(`  ✏️ Update nama thread: "${targetThread.name}" → "${currentName}"`);
+                        console.log(`[INFO] Update nama thread: "${targetThread.name}" → "${currentName}"`);
                         await targetThread.edit({ name: currentName }).catch(err => {
-                            console.warn(`  [WARN] Gagal update nama thread: ${err.message}`);
+                            console.warn(`[WARN] Gagal update nama thread: ${err.message}`);
                         });
                     }
                 }
@@ -442,12 +422,12 @@ async function processForumLogs(guild) {
                     hasImageUrl = true;
                     
                     if (imageUrls.length > 0) {
-                        console.log(`    ✓ Ditemukan ${imageUrls.length} gambar`);
+                        console.log(`  ✓ Ditemukan ${imageUrls.length} gambar untuk ID ${log.id}`);
                     } else {
-                        console.log(`    ⚠ URL ditemukan tapi tidak valid`);
+                        console.log(`  ⚠ URL ditemukan tapi tidak valid untuk ID ${log.id}`);
                     }
                 } else {
-                    console.log(`    ℹ Tidak ada gambar`);
+                    console.log(`  ℹ Tidak ada gambar untuk ID ${log.id}`);
                 }
 
                 // === BUAT MAIN EMBED ===
@@ -497,7 +477,7 @@ async function processForumLogs(guild) {
                 // === KIRIM SEMUA EMBEDS SEKALIGUS ===
                 try {
                     await targetThread.send({ embeds });
-                    console.log(`  ✅ Log ID ${log.id} + ${imageUrls.length} gambar terkirim`);
+                    console.log(`[SUCCESS] Log ID ${log.id} + ${imageUrls.length} gambar terkirim ke thread: ${namaUser}`);
                 } catch (sendErr) {
                     console.error(`  ✗ GAGAL KIRIM ID ${log.id}: ${sendErr.message}`);
                     continue;
@@ -517,12 +497,12 @@ async function processForumLogs(guild) {
                                 .remove([pathLengkap]);
                             
                             if (delError) {
-                                console.warn(`    ⚠ Gagal hapus file ${ambilNamaFile}: ${delError.message}`);
+                                console.warn(`  ⚠ Gagal hapus file ${ambilNamaFile}: ${delError.message}`);
                             } else {
-                                console.log(`    ✓ File dihapus: ${ambilNamaFile}`);
+                                console.log(`  ✓ File dihapus: ${ambilNamaFile}`);
                             }
                         } catch (storageErr) {
-                            console.warn(`    ⚠ Error hapus storage:`, storageErr.message);
+                            console.warn(`  ⚠ Error hapus storage:`, storageErr.message);
                         }
                     }
                 }
@@ -535,12 +515,12 @@ async function processForumLogs(guild) {
                         .eq('id', log.id);
 
                     if (upError) {
-                        console.error(`    ✗ Gagal archive ID ${log.id}: ${upError.message}`);
+                        console.error(`  ✗ Gagal archive ID ${log.id}: ${upError.message}`);
                     } else {
-                        console.log(`    ✓ Data ID ${log.id} di-archive`);
+                        console.log(`  ✓ Data ID ${log.id} di-archive`);
                     }
                 } catch (archiveErr) {
-                    console.error(`    ✗ Error archive ID ${log.id}: ${archiveErr.message}`);
+                    console.error(`  ✗ Error archive ID ${log.id}: ${archiveErr.message}`);
                 }
 
             } catch (errLoop) {
@@ -548,7 +528,7 @@ async function processForumLogs(guild) {
             }
         }
         
-        console.log("[FORUM-LOGS] ✅ Selesai proses forum logs.");
+        console.log("[DEBUG] Selesai proses forum logs.");
     } catch (errGlobal) {
         console.error("[CRITICAL ERROR] processForumLogs:", errGlobal.message);
     }
@@ -557,16 +537,8 @@ async function processForumLogs(guild) {
 // --- FUNGSI PENGECEKAN ANGGOTA (REMINDER) ---
 async function checkMissingAbsence(channel) {
     try {
-        const { data: listUser, error: errU } = await supabase.from('users_masters').select('discord_id');
-        if (errU) {
-            console.error("[REMINDER ERROR] Gagal fetch users_masters:", errU.message);
-            return;
-        }
-
-        if (!listUser || listUser.length === 0) {
-            console.log("[REMINDER] Tidak ada user di database");
-            return;
-        }
+        const { data: listUser, error: errU } = await supabase.from('users_master').select('discord_id');
+        if (errU) return;
 
         const hariIni = new Date();
         hariIni.setHours(0, 0, 0, 0);
@@ -576,15 +548,10 @@ async function checkMissingAbsence(channel) {
             .select('discord_id')
             .gte('created_at', hariIni.toISOString());
 
-        if (errA) {
-            console.error("[REMINDER ERROR] Gagal fetch absensi_sapd:", errA.message);
-            return;
-        }
+        if (errA) return;
 
-        const sudahAbsen = listAbsen ? listAbsen.map(u => u.discord_id) : [];
+        const sudahAbsen = listAbsen.map(u => u.discord_id);
         const belumAbsen = listUser.filter(u => !sudahAbsen.includes(u.discord_id));
-
-        console.log(`[REMINDER] Total user: ${listUser.length}, Sudah absen: ${sudahAbsen.length}, Belum absen: ${belumAbsen.length}`);
 
         if (belumAbsen.length > 0) {
             let mentionBelum = "";
@@ -593,172 +560,95 @@ async function checkMissingAbsence(channel) {
             });
 
             await channel.send(`⚠️ **REMINDER ABSENSI**\nAnggota berikut belum absen hari ini:\n${mentionBelum}\n\nSilakan absen di: https://san-andreas-police-departement.netlify.app/\n@everyone`);
-            console.log("[REMINDER] ✅ Reminder terkirim");
-        } else {
-            console.log("[REMINDER] ℹ Semua anggota sudah absen");
         }
     } catch (e) {
-        console.error("[REMINDER ERROR]", e.message);
+        console.error("Reminder Error:", e.message);
     }
 }
 
 // --- TUGAS RUTIN (SINKRONISASI & FORUM) ---
 async function runSapdTask() {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`--- [START TASK ${new Date().toLocaleString()}] ---`);
-    console.log(`${'='.repeat(60)}`);
+    console.log(`\n--- [START TASK ${new Date().toLocaleString()}] ---`);
     
     const serverGuild = client.guilds.cache.get(DISCORD_GUILD_ID);
-    if (!serverGuild) {
-        console.error("[ERROR] Guild tidak ditemukan!");
-        return;
-    }
+    if (!serverGuild) return;
 
     try {
         // --- PHASE 1: CLEANUP DATA LAMA ---
-        console.log("\n📋 PHASE 1: CLEANUP DATA LAMA");
-        try {
-            await cleanupUsersWithoutRole(serverGuild);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) {
-            console.error("[PHASE 1 ERROR]", err.message);
-        }
-
-        try {
-            await cleanupOrphanedAbsences(serverGuild);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) {
-            console.error("[PHASE 2 ERROR]", err.message);
-        }
+        await cleanupUsersWithoutRole(serverGuild);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await cleanupOrphanedAbsences(serverGuild);
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // --- PHASE 1B: TANDAI THREAD SEBAGAI ARCHIVED ---
-        console.log("\n📌 PHASE 1B: ARCHIVE THREAD");
-        try {
-            await markThreadAsArchived(serverGuild);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) {
-            console.error("[PHASE ARCHIVE ERROR]", err.message);
-        }
+        await markThreadAsArchived(serverGuild);
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // --- PHASE 2: SINKRONISASI DATA BARU ---
-        console.log("\n👥 PHASE 2: SINKRONISASI DATA MEMBER");
-        try {
-            console.log("[SYNC] Memulai fetch semua members...");
-            const daftarMember = await serverGuild.members.fetch();
-            console.log(`[SYNC] Total members di guild: ${daftarMember.size}`);
+        const daftarMember = await serverGuild.members.fetch();
+        const arrayDataMaster = [];
+        const idsAktif = [];
 
-            const arrayDataMaster = [];
-            let membersWithRole = 0;
-            let membersWithoutRole = 0;
+        daftarMember.forEach(member => {
+            if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
+                let pnk = "-";
+                let div = "-";
 
-            daftarMember.forEach(member => {
-                const hasPangkat = member.roles.cache.some(role => PANGKAT_MAP[role.id]);
-                const hasDivisi = member.roles.cache.some(role => DIVISI_MAP[role.id]);
-                
-                if (member.roles.cache.has(REQUIRED_ROLE_ID)) {
-                    console.log(`  ✅ @${member.user.username} - HAS REQUIRED_ROLE`);
-                    membersWithRole++;
+                member.roles.cache.forEach(role => {
+                    if (PANGKAT_MAP[role.id]) pnk = PANGKAT_MAP[role.id];
+                    if (DIVISI_MAP[role.id]) div = DIVISI_MAP[role.id];
+                });
 
-                    let pnk = "-";
-                    let div = "-";
+                const namaDisplay = member.nickname || member.user.username;
+                idsAktif.push(member.id);
 
-                    member.roles.cache.forEach(role => {
-                        if (PANGKAT_MAP[role.id]) pnk = PANGKAT_MAP[role.id];
-                        if (DIVISI_MAP[role.id]) div = DIVISI_MAP[role.id];
-                    });
-
-                    const namaDisplay = member.nickname || member.user.username;
-
-                    arrayDataMaster.push({
-                        discord_id: member.id,
-                        nama_anggota: namaDisplay,
-                        pangkat: pnk,
-                        divisi: div,
-                        is_admin: member.roles.cache.has(ADMIN_ROLE_ID),
-                        last_login: new Date().toISOString()
-                    });
-                } else {
-                    membersWithoutRole++;
-                }
-            });
-
-            console.log(`[SYNC] Summary: ${membersWithRole} dengan REQUIRED_ROLE, ${membersWithoutRole} tanpa REQUIRED_ROLE`);
-            console.log(`[SYNC] Data siap upsert: ${arrayDataMaster.length}`);
-
-            if (arrayDataMaster.length > 0) {
-                const { error: upsertError } = await supabase
-                    .from('users_masters')
-                    .upsert(arrayDataMaster, { onConflict: 'discord_id' });
-                
-                if (upsertError) {
-                    console.error(`[SYNC ERROR] Gagal upsert: ${upsertError.message}`);
-                } else {
-                    console.log(`[SYNC SUCCESS] ✅ ${arrayDataMaster.length} user berhasil di-upsert`);
-                }
-            } else {
-                console.warn(`[SYNC WARNING] ⚠️ Tidak ada member dengan REQUIRED_ROLE untuk di-upsert!`);
+                arrayDataMaster.push({
+                    discord_id: member.id,
+                    nama_anggota: namaDisplay,
+                    pangkat: pnk,
+                    divisi: div,
+                    is_admin: member.roles.cache.has(ADMIN_ROLE_ID),
+                    last_login: new Date().toISOString()
+                });
             }
+        });
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) {
-            console.error("[PHASE SYNC ERROR]", err.message);
+        // Simpan data terbaru
+        if (arrayDataMaster.length > 0) {
+            await supabase.from('users_master').upsert(arrayDataMaster, { onConflict: 'discord_id' });
+            console.log(`[SYNC] ${arrayDataMaster.length} user berhasil di-upsert`);
         }
 
         // --- PHASE 3: PROSES FORUM ---
-        console.log("\n💬 PHASE 3: PROSES FORUM LOGS");
-        try {
-            await processForumLogs(serverGuild);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) {
-            console.error("[PHASE FORUM ERROR]", err.message);
-        }
+        await processForumLogs(serverGuild);
 
         // --- PHASE 4: REMINDER ABSENSI ---
-        console.log("\n🔔 PHASE 4: REMINDER ABSENSI");
-        try {
-            const waktuJkt = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
-            const jamSekarang = waktuJkt.getHours();
-            const menitSekarang = waktuJkt.getMinutes();
+        const waktuJkt = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
+        const jamSekarang = waktuJkt.getHours();
+        const menitSekarang = waktuJkt.getMinutes();
 
-            console.log(`[REMINDER] Waktu JKT: ${jamSekarang}:${menitSekarang}`);
-
-            if (menitSekarang <= 10) {
-                if (jamSekarang === 19 || jamSekarang === 22) {
-                    console.log("[REMINDER] ⏰ Waktu reminder, mengirim notifikasi...");
-                    const channelAnnounce = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
-                    if (channelAnnounce) {
-                        await checkMissingAbsence(channelAnnounce);
-                    } else {
-                        console.error("[REMINDER ERROR] Channel announcement tidak ditemukan");
-                    }
-                } else {
-                    console.log(`[REMINDER] ⏭️ Bukan jam reminder (jam: ${jamSekarang})`);
-                }
-            } else {
-                console.log(`[REMINDER] ⏭️ Belum waktunya reminder (menit: ${menitSekarang})`);
+        if (menitSekarang <= 10) {
+            if (jamSekarang === 19 || jamSekarang === 22) {
+                const channelAnnounce = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID);
+                if (channelAnnounce) await checkMissingAbsence(channelAnnounce);
             }
-        } catch (err) {
-            console.error("[PHASE REMINDER ERROR]", err.message);
         }
 
-        console.log("\n" + "=".repeat(60));
-        console.log("--- [TASK COMPLETED] ---");
-        console.log("=".repeat(60) + "\n");
+        console.log("--- [TASK COMPLETED] ---\n");
     } catch (err) {
-        console.error("\n[CRITICAL ERROR] Main Task Error:", err.message);
-        console.log("=".repeat(60) + "\n");
+        console.error("Main Task Error:", err.message);
     }
 }
 
 // --- EVENT BOT READY ---
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log("\n========================================");
-    console.log(`✅ Bot Terhubung Sebagai: ${client.user.tag}`);
-    console.log("📡 Status: Online & Monitoring Supabase");
+    console.log(`Bot Terhubung Sebagai: ${client.user.tag}`);
+    console.log("Status: Online & Monitoring Supabase");
     console.log("========================================\n");
     
     runSapdTask();
-    setInterval(runSapdTask, 1200000); // Jalankan setiap 20 menit
+    setInterval(runSapdTask, 600000); // Jalankan setiap 10 menit
 });
 
 // --- LOGIN ---
