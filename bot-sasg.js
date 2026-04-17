@@ -118,7 +118,7 @@ async function cleanupUsersWithoutRole(guild) {
 
                     // 2A. HAPUS GAMBAR BUKTI DARI STORAGE
                     const { data: absenRecords, error: absenErr } = await supabase
-                        .from('absensi_sasg')
+                        .from('absensi_sapd')
                         .select('id, bukti_foto')
                         .eq('discord_id', discordId);
 
@@ -147,7 +147,7 @@ async function cleanupUsersWithoutRole(guild) {
 
                     // 2B. HAPUS SEMUA DATA ABSENSI USER
                     const { error: delAbsenErr } = await supabase
-                        .from('absensi_sasg')
+                        .from('absensi_sapd')
                         .delete()
                         .eq('discord_id', discordId);
 
@@ -201,13 +201,13 @@ async function cleanupOrphanedAbsences(guild) {
 
         const validUserIds = validUsers ? validUsers.map(u => u.discord_id) : [];
 
-        // 2. AMBIL SEMUA DATA DI absensi_sasg
+        // 2. AMBIL SEMUA DATA DI absensi_sapd
         const { data: allAbsences, error: fetchAbsenErr } = await supabase
-            .from('absensi_sasg')
+            .from('absensi_sapd')
             .select('id, discord_id, bukti_foto');
 
         if (fetchAbsenErr) {
-            console.error("[DB ERROR] Gagal fetch absensi_sasg:", fetchAbsenErr.message);
+            console.error("[DB ERROR] Gagal fetch absensi_sapd:", fetchAbsenErr.message);
             return;
         }
 
@@ -256,7 +256,7 @@ async function cleanupOrphanedAbsences(guild) {
 
                     // 3B. HAPUS DATA ABSENSI
                     const { error: delAbsenErr } = await supabase
-                        .from('absensi_sasg')
+                        .from('absensi_sapd')
                         .delete()
                         .eq('id', absenceRecord.id);
 
@@ -367,7 +367,7 @@ async function processForumLogs(guild) {
         }
 
         const { data: logs, error: fetchError } = await supabase
-            .from('absensi_sasg')
+            .from('absensi_sapd')
             .select('*')
             .eq('is_archived', false);
 
@@ -457,7 +457,7 @@ async function processForumLogs(guild) {
                         { name: 'Keterangan/Alasan', value: alasanKirim, inline: false }
                     )
                     .setTimestamp(new Date(log.created_at))
-                    .setFooter({ text: "SASG Attendance System" });
+                    .setFooter({ text: "SAPD Attendance System" });
 
                 // === TAMBAH FIELD JIKA TIDAK ADA GAMBAR ===
                 if (imageUrls.length === 0 && hasImageUrl) {
@@ -524,7 +524,7 @@ async function processForumLogs(guild) {
                 // === ARCHIVE RECORD ===
                 try {
                     const { error: upError } = await supabase
-                        .from('absensi_sasg')
+                        .from('absensi_sapd')
                         .update({ is_archived: true })
                         .eq('id', log.id);
 
@@ -558,7 +558,7 @@ async function checkMissingAbsence(channel) {
         hariIni.setHours(0, 0, 0, 0);
 
         const { data: listAbsen, error: errA } = await supabase
-            .from('absensi_sasg')
+            .from('absensi_sapd')
             .select('discord_id')
             .gte('created_at', hariIni.toISOString());
 
@@ -581,7 +581,7 @@ async function checkMissingAbsence(channel) {
 }
 
 // --- TUGAS RUTIN (SINKRONISASI & FORUM) ---
-async function runSasgTask() {
+async function runSapdTask() {
     console.log(`\n--- [START TASK ${new Date().toLocaleString()}] ---`);
     
     const serverGuild = client.guilds.cache.get(DISCORD_GUILD_ID);
@@ -661,8 +661,8 @@ client.once('clientReady', () => {
     console.log("Status: Online & Monitoring Supabase");
     console.log("========================================\n");
     
-    runSasgTask();
-    setInterval(runSasgTask, 600000); // Jalankan setiap 10 menit
+    runSapdTask();
+    setInterval(runSapdTask, 600000); // Jalankan setiap 10 menit
 });
 
 // --- LOGIN ---
