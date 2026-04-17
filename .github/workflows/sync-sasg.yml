@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Both Bots
         # GANTI BAGIAN INI: Memanggil npm start agar menjalankan kedua file sekaligus
-        run: npm start 
+        run: node bot-sasg.js 
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
