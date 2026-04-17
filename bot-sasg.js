@@ -83,14 +83,14 @@ function isValidUrl(url) {
     }
 }
 
-// --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTER ---
+// --- FUNGSI 1: CLEANUP USER YANG TIDAK PUNYA REQUIRED ROLE DARI USERS_MASTERS ---
 async function cleanupUsersWithoutRole(guild) {
-    console.log("[CLEANUP-1] Memulai cleanup user tanpa required role dari users_master...");
+    console.log("[CLEANUP-1] Memulai cleanup user tanpa required role dari users_masters...");
     
     try {
         // 1. AMBIL SEMUA USER DI users_master
         const { data: allUsersInDb, error: fetchErr } = await supabase
-            .from('users_master')
+            .from('users_masters')
             .select('discord_id');
 
         if (fetchErr) {
@@ -99,7 +99,7 @@ async function cleanupUsersWithoutRole(guild) {
         }
 
         if (!allUsersInDb || allUsersInDb.length === 0) {
-            console.log("[CLEANUP-1] users_master kosong.");
+            console.log("[CLEANUP-1] users_masters kosong.");
             return;
         }
 
@@ -159,12 +159,12 @@ async function cleanupUsersWithoutRole(guild) {
 
                     // 2C. HAPUS USER DARI users_master
                     const { error: delUserErr } = await supabase
-                        .from('users_master')
+                        .from('users_masters')
                         .delete()
                         .eq('discord_id', discordId);
 
                     if (!delUserErr) {
-                        console.log(`  ✓ User ${discordId} dihapus dari users_master`);
+                        console.log(`  ✓ User ${discordId} dihapus dari users_masters`);
                         cleanupCount++;
                     } else {
                         console.warn(`  ⚠ Gagal hapus user: ${delUserErr.message}`);
@@ -191,11 +191,11 @@ async function cleanupOrphanedAbsences(guild) {
     try {
         // 1. AMBIL SEMUA USER DI users_master
         const { data: validUsers, error: fetchValidErr } = await supabase
-            .from('users_master')
+            .from('users_masters')
             .select('discord_id');
 
         if (fetchValidErr) {
-            console.error("[DB ERROR] Gagal fetch users_master:", fetchValidErr.message);
+            console.error("[DB ERROR] Gagal fetch users_masters:", fetchValidErr.message);
             return;
         }
 
@@ -294,7 +294,7 @@ async function markThreadAsArchived(guild) {
 
         // Ambil user valid dari users_master (yang masih punya role)
         const { data: validUsers, error: fetchErr } = await supabase
-            .from('users_master')
+            .from('users_masters')
             .select('discord_id');
 
         if (fetchErr) {
@@ -330,7 +330,7 @@ async function markThreadAsArchived(guild) {
                     if (!thread.name.includes('[ARCHIVED]')) {
                         const newName = `[ARCHIVED] ${thread.name}`.substring(0, 100);
                         
-                        const reason = !userInDb ? "tidak ada di users_master" : "tidak punya required role";
+                        const reason = !userInDb ? "tidak ada di users_masters" : "tidak punya required role";
                         console.log(`[ARCHIVE-THREAD] Tandai thread (${reason}): "${thread.name}" → "${newName}"`);
                         
                         try {
@@ -551,7 +551,7 @@ async function processForumLogs(guild) {
 // --- FUNGSI PENGECEKAN ANGGOTA (REMINDER) ---
 async function checkMissingAbsence(channel) {
     try {
-        const { data: listUser, error: errU } = await supabase.from('users_master').select('discord_id');
+        const { data: listUser, error: errU } = await supabase.from('users_masters').select('discord_id');
         if (errU) return;
 
         const hariIni = new Date();
@@ -629,7 +629,7 @@ async function runSapdTask() {
 
         // Simpan data terbaru
         if (arrayDataMaster.length > 0) {
-            await supabase.from('users_master').upsert(arrayDataMaster, { onConflict: 'discord_id' });
+            await supabase.from('users_masters').upsert(arrayDataMaster, { onConflict: 'discord_id' });
             console.log(`[SYNC] ${arrayDataMaster.length} user berhasil di-upsert`);
         }
 
